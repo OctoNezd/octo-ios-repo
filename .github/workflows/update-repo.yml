@@ -1,0 +1,189 @@
+name: Update and Deploy Repository
+
+on:
+  # Run on push to main branch
+  push:
+    branches: [ main ]
+  
+  # Run on a schedule (daily at 00:00 UTC)
+  schedule:
+    - cron: '0 0 * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+# Sets permissions for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      
+      - name: Run merge script
+        run: |
+          python merge_repos.py
+          echo "Script execution completed"
+          
+      - name: Verify output
+        run: |
+          if [ -f merged_altstore.json ]; then
+            echo "✓ merged_altstore.json created successfully"
+            echo "File size: $(du -h merged_altstore.json | cut -f1)"
+            echo ""
+            echo "Content preview:"
+            head -n 20 merged_altstore.json
+          else
+            echo "✗ Error: merged_altstore.json not found"
+            exit 1
+          fi
+      
+      - name: Create index.html
+        run: |
+          cat > index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>OctoNezd's iOS Repository</title>
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                      max-width: 800px;
+                      margin: 50px auto;
+                      padding: 20px;
+                      line-height: 1.6;
+                      color: #333;
+                  }
+                  .container {
+                      background: #f9f9f9;
+                      padding: 30px;
+                      border-radius: 10px;
+                      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                  }
+                  h1 {
+                      color: #007AFF;
+                      margin-bottom: 10px;
+                  }
+                  .subtitle {
+                      color: #666;
+                      font-size: 1.1em;
+                      margin-bottom: 30px;
+                  }
+                  .button {
+                      display: inline-block;
+                      background: #007AFF;
+                      color: white;
+                      padding: 12px 30px;
+                      text-decoration: none;
+                      border-radius: 8px;
+                      font-weight: 600;
+                      margin: 10px 10px 10px 0;
+                      transition: background 0.3s;
+                  }
+                  .button:hover {
+                      background: #0051D5;
+                  }
+                  .button.secondary {
+                      background: #5856D6;
+                  }
+                  .button.secondary:hover {
+                      background: #4644B8;
+                  }
+                  .info {
+                      background: white;
+                      padding: 20px;
+                      border-radius: 8px;
+                      margin-top: 30px;
+                      border-left: 4px solid #007AFF;
+                  }
+                  .info h2 {
+                      margin-top: 0;
+                      color: #007AFF;
+                      font-size: 1.3em;
+                  }
+                  code {
+                      background: #e8e8e8;
+                      padding: 2px 6px;
+                      border-radius: 3px;
+                      font-family: 'Monaco', 'Courier New', monospace;
+                  }
+                  .updated {
+                      color: #666;
+                      font-size: 0.9em;
+                      margin-top: 20px;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🍎 OctoNezd's iOS Repository</h1>
+                  <p class="subtitle">Merged AltStore repository with apps and games</p>
+                  
+                  <a href="altstore://source?url=https://octonezd.me/octo-ios-repo/merged_altstore.json" class="button">
+                      Add to AltStore
+                  </a>
+                  <a href="merged_altstore.json" class="button secondary">
+                      View JSON
+                  </a>
+                  
+                  <div class="info">
+                      <h2>📱 How to use</h2>
+                      <ol>
+                          <li>Make sure you have <strong>AltStore</strong> installed on your iOS device</li>
+                          <li>Click the "Add to AltStore" button above on your iOS device</li>
+                          <li>Alternatively, copy this URL and add it manually in AltStore:
+                              <br><code>https://octonezd.me/octo-ios-repo/merged_altstore.json</code>
+                          </li>
+                      </ol>
+                  </div>
+                  
+                  <div class="info">
+                      <h2>ℹ️ About</h2>
+                      <p>This repository is automatically updated daily and contains merged apps from multiple sources.</p>
+                      <p>Repository automatically updates every day at midnight UTC.</p>
+                  </div>
+                  
+                  <p class="updated">Last updated: <span id="updated"></span></p>
+              </div>
+              
+              <script>
+                  document.getElementById('updated').textContent = new Date().toLocaleString();
+              </script>
+          </body>
+          </html>
+          EOF
+          echo "✓ index.html created"
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
